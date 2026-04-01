@@ -1,6 +1,7 @@
 from flask import Flask, request
 import requests
 import os
+import threading  # 👈 ADD THIS
 
 app = Flask(__name__)
 
@@ -11,53 +12,56 @@ SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 def slack_command():
     trigger_id = request.form.get("trigger_id")
 
-    url = "https://slack.com/api/views.open"
+    def open_modal():  # 👈 wrap your existing logic
+        url = "https://slack.com/api/views.open"
 
-    headers = {
-        "Authorization": f"Bearer {SLACK_BOT_TOKEN}",
-        "Content-Type": "application/json"
-    }
-
-    data = {
-        "trigger_id": trigger_id,
-        "view": {
-            "type": "modal",
-            "title": {"type": "plain_text", "text": "Log Sentiment"},
-            "submit": {"type": "plain_text", "text": "Save"},
-            "blocks": [
-                {
-                    "type": "input",
-                    "block_id": "sentiment",
-                    "label": {"type": "plain_text", "text": "Sentiment"},
-                    "element": {
-                        "type": "static_select",
-                        "action_id": "value",
-                        "options": [
-                            {"text": {"type": "plain_text", "text": "Good"}, "value": "good"},
-                            {"text": {"type": "plain_text", "text": "Neutral"}, "value": "neutral"},
-                            {"text": {"type": "plain_text", "text": "Bad"}, "value": "bad"}
-                        ]
-                    }
-                },
-                {
-                    "type": "input",
-                    "block_id": "note",
-                    "label": {"type": "plain_text", "text": "Notes"},
-                    "element": {
-                        "type": "plain_text_input",
-                        "action_id": "value"
-                    }
-                }
-            ]
+        headers = {
+            "Authorization": f"Bearer {SLACK_BOT_TOKEN}",
+            "Content-Type": "application/json"
         }
-    }
 
-    requests.post(url, headers=headers, json=data)
+        data = {
+            "trigger_id": trigger_id,
+            "view": {
+                "type": "modal",
+                "title": {"type": "plain_text", "text": "Log Sentiment"},
+                "submit": {"type": "plain_text", "text": "Save"},
+                "blocks": [
+                    {
+                        "type": "input",
+                        "block_id": "sentiment",
+                        "label": {"type": "plain_text", "text": "Sentiment"},
+                        "element": {
+                            "type": "static_select",
+                            "action_id": "value",
+                            "options": [
+                                {"text": {"type": "plain_text", "text": "Good"}, "value": "good"},
+                                {"text": {"type": "plain_text", "text": "Neutral"}, "value": "neutral"},
+                                {"text": {"type": "plain_text", "text": "Bad"}, "value": "bad"}
+                            ]
+                        }
+                    },
+                    {
+                        "type": "input",
+                        "block_id": "note",
+                        "label": {"type": "plain_text", "text": "Notes"},
+                        "element": {
+                            "type": "plain_text_input",
+                            "action_id": "value"
+                        }
+                    }
+                ]
+            }
+        }
+
+        requests.post(url, headers=headers, json=data)
+
+    # 👇 THIS is the key change
+    threading.Thread(target=open_modal).start()
 
     return "", 200
 
 
-# 👇 ADD IT HERE
 @app.route("/slack/interactions", methods=["POST"])
 def interactions():
     payload = request.form.get("payload")
