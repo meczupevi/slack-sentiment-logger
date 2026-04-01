@@ -6,6 +6,7 @@ app = Flask(__name__)
 
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 
+
 @app.route("/slack/command", methods=["POST"])
 def slack_command():
     trigger_id = request.form.get("trigger_id")
@@ -21,22 +22,13 @@ def slack_command():
         "trigger_id": trigger_id,
         "view": {
             "type": "modal",
-            "title": {
-                "type": "plain_text",
-                "text": "Log Sentiment"
-            },
-            "submit": {
-                "type": "plain_text",
-                "text": "Save"
-            },
+            "title": {"type": "plain_text", "text": "Log Sentiment"},
+            "submit": {"type": "plain_text", "text": "Save"},
             "blocks": [
                 {
                     "type": "input",
                     "block_id": "sentiment",
-                    "label": {
-                        "type": "plain_text",
-                        "text": "Sentiment"
-                    },
+                    "label": {"type": "plain_text", "text": "Sentiment"},
                     "element": {
                         "type": "static_select",
                         "action_id": "value",
@@ -50,10 +42,7 @@ def slack_command():
                 {
                     "type": "input",
                     "block_id": "note",
-                    "label": {
-                        "type": "plain_text",
-                        "text": "Notes"
-                    },
+                    "label": {"type": "plain_text", "text": "Notes"},
                     "element": {
                         "type": "plain_text_input",
                         "action_id": "value"
@@ -64,6 +53,20 @@ def slack_command():
     }
 
     requests.post(url, headers=headers, json=data)
+
+    return "", 200
+
+
+# 👇 ADD IT HERE
+@app.route("/slack/interactions", methods=["POST"])
+def interactions():
+    payload = request.form.get("payload")
+
+    import json
+    data = json.loads(payload)
+
+    print("FORM SUBMISSION:")
+    print(json.dumps(data, indent=2))
 
     return "", 200
 
