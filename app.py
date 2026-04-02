@@ -152,7 +152,15 @@ def interactions():
 
     sheet_url = os.environ.get("GOOGLE_SHEETS_WEBHOOK")
 
-    payload = {
+    print("NEW ENTRY:")
+    print("Customer:", customer)
+    print("Sentiment:", sentiment)
+    print("Topic:", topic)
+    print("Note:", note)
+    print("CSM:", username, "|", user_id)
+
+    # 👇 prepare payload
+    sheet_payload = {
         "customer": customer,
         "sentiment": sentiment,
         "topic": topic,
@@ -161,10 +169,8 @@ def interactions():
         "secret": os.environ.get("SHEET_SECRET")
     }
 
-    try:
-        requests.post(sheet_url, json=payload)
-    except Exception as e:
-        print("Error sending to Google Sheets:", e)
+    # 👇 async send (CRITICAL)
+    threading.Thread(target=send_to_sheets, args=(sheet_payload,)).start()
 
     return "", 200
 
