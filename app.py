@@ -8,6 +8,13 @@ app = Flask(__name__)
 
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 
+def send_to_sheets(payload):
+    sheet_url = os.environ.get("GOOGLE_SHEETS_WEBHOOK")
+
+    try:
+        requests.post(sheet_url, json=payload)
+    except Exception as e:
+        print("Error sending to Google Sheets:", e)
 
 # -----------------------------
 # SLASH COMMAND → OPEN MODAL
