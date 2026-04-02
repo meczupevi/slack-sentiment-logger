@@ -150,8 +150,22 @@ def interactions():
     print("Note:", note)
     print("Logged by:", username, "|", user_id)
 
-    return "", 200
+    sheet_url = os.environ.get("GOOGLE_SHEETS_WEBHOOK")
 
+    payload = {
+        "customer": customer,
+        "sentiment": sentiment,
+        "topic": topic,
+        "note": note,
+        "user": username
+    }
+
+    try:
+        requests.post(sheet_url, json=payload)
+    except Exception as e:
+        print("Error sending to Google Sheets:", e)
+
+    return "", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)
