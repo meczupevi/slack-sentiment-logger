@@ -1,18 +1,22 @@
 from flask import Flask, request
 import requests
 import os
-import threading  # 👈 ADD THIS
+import threading
+import json
 
 app = Flask(__name__)
 
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 
 
+# -----------------------------
+# SLASH COMMAND → OPEN MODAL
+# -----------------------------
 @app.route("/slack/command", methods=["POST"])
 def slack_command():
     trigger_id = request.form.get("trigger_id")
 
-    def open_modal():  # 👈 wrap your existing logic
+    def open_modal():
         url = "https://slack.com/api/views.open"
 
         headers = {
@@ -29,24 +33,47 @@ def slack_command():
                 "blocks": [
                     {
                         "type": "input",
+                        "block_id": "customer",
+                        "label": {"type": "plain_text", "text": "Customer"},
+                        "element": {
+                            "type": "external_select",
+                            "action_id": "value",
+                            "placeholder": {
+                                "type": "plain_text",
+                                "text": "Search customer"
+                            }
+                        }
+                    },
+                    {
+                        "type": "input",
                         "block_id": "sentiment",
                         "label": {"type": "plain_text", "text": "Sentiment"},
                         "element": {
                             "type": "static_select",
                             "action_id": "value",
                             "options": [
-                                {"text": {"type": "plain_text", "text": "Good"}, "value": "good"},
+                                {"text": {"type": "plain_text", "text": "Positive"}, "value": "positive"},
                                 {"text": {"type": "plain_text", "text": "Neutral"}, "value": "neutral"},
-                                {"text": {"type": "plain_text", "text": "Bad"}, "value": "bad"}
+                                {"text": {"type": "plain_text", "text": "Negative"}, "value": "negative"}
                             ]
                         }
                     },
                     {
                         "type": "input",
-                        "block_id": "note",
-                        "label": {"type": "plain_text", "text": "Notes"},
+                        "block_id": "topic",
+                        "label": {"type": "plain_text", "text": "Topic"},
                         "element": {
                             "type": "plain_text_input",
+                            "action_id": "value"
+                        }
+                    },
+                    {
+                        "type": "input",
+                        "block_id": "note",
+                        "label": {"type": "plain_text", "text": "Note"},
+                        "element": {
+                            "type": "plain_text_input",
+                            "multiline": True,
                             "action_id": "value"
                         }
                     }
@@ -56,21 +83,61 @@ def slack_command():
 
         requests.post(url, headers=headers, json=data)
 
-    # 👇 THIS is the key change
+    # async → avoid Slack timeout
     threading.Thread(target=open_modal).start()
 
     return "", 200
 
 
+# -----------------------------
+# DYNAMIC CUSTOMER OPTIONS
+# -----------------------------
+@app.route("/slack/options", methods=["POST"])
+def slack_options():
+    query = request.form.get("value", "").lower()
+
+    customers_str = os.environ.get("CUSTOMERS", "")
+    customers = [c.strip() for c in customers_str.split(",") if c.strip()]
+
+    options = []
+
+    for customer in customers:
+        if query in customer.lower():
+            options.append({
+                "text": {"type": "plain_text", "text": customer},
+                "value": customer
+            })
+
+        if len(options) >= 50:
+            break
+
+    return {"options": options}
+
+
+# -----------------------------
+# FORM SUBMISSION HANDLER
+# -----------------------------
 @app.route("/slack/interactions", methods=["POST"])
 def interactions():
     payload = request.form.get("payload")
-
-    import json
     data = json.loads(payload)
 
-    print("FORM SUBMISSION:")
-    print(json.dumps(data, indent=2))
+    values = data["view"]["state"]["values"]
+
+    customer = values["customer"]["value"]["selected_option"]["value"]
+    sentiment = values["sentiment"]["value"]["selected_option"]["value"]
+    topic = values["topic"]["value"]["value"]
+    note = values["note"]["value"]["value"]
+
+    user_id = data["user"]["id"]
+    username = data["user"]["username"]
+
+    print("NEW ENTRY:")
+    print("Customer:", customer)
+    print("Sentiment:", sentiment)
+    print("Topic:", topic)
+    print("Note:", note)
+    print("CSM:", username, "|", user_id)
 
     return "", 200
 
