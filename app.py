@@ -8,6 +8,10 @@ app = Flask(__name__)
 
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 
+
+# -----------------------------
+# SEND TO GOOGLE SHEETS
+# -----------------------------
 def send_to_sheets(payload):
     sheet_url = os.environ.get("GOOGLE_SHEETS_WEBHOOK")
 
@@ -16,12 +20,37 @@ def send_to_sheets(payload):
     except Exception as e:
         print("Error sending to Google Sheets:", e)
 
+
+# -----------------------------
+# SEND SLACK CONFIRMATION
+# -----------------------------
+def send_confirmation(user_id, channel_id, customer, topic):
+    url = "https://slack.com/api/chat.postEphemeral"
+
+    headers = {
+        "Authorization": f"Bearer {SLACK_BOT_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    message = {
+        "channel": channel_id,
+        "user": user_id,
+        "text": f"✅ Logged interaction for *{customer}*\nTopic: {topic}"
+    }
+
+    try:
+        requests.post(url, headers=headers, json=message)
+    except Exception as e:
+        print("Error sending confirmation:", e)
+
+
 # -----------------------------
 # SLASH COMMAND → OPEN MODAL
 # -----------------------------
 @app.route("/slack/command", methods=["POST"])
 def slack_command():
     trigger_id = request.form.get("trigger_id")
+    channel_id = request.form.get("channel_id")
 
     def open_modal():
         url = "https://slack.com/api/views.open"
@@ -35,6 +64,9 @@ def slack_command():
             "trigger_id": trigger_id,
             "view": {
                 "type": "modal",
+                "private_metadata": json.dumps({
+                    "channel_id": channel_id
+                }),
                 "title": {"type": "plain_text", "text": "Log Sentiment"},
                 "submit": {"type": "plain_text", "text": "Save"},
                 "blocks": [
@@ -145,19 +177,14 @@ def interactions():
     topic = values["topic"]["value"]["selected_option"]["value"]
 
     note_block = values["note"]["value"]
-    note = note_block.get("value", "")
+    note = note_block.get("value") or ""
 
     user_id = data["user"]["id"]
     username = data["user"]["username"]
 
-    print("NEW ENTRY:")
-    print("Customer:", customer)
-    print("Sentiment:", sentiment)
-    print("Topic:", topic)
-    print("Note:", note)
-    print("Logged by:", username, "|", user_id)
-
-    sheet_url = os.environ.get("GOOGLE_SHEETS_WEBHOOK")
+    # get channel from metadata
+    metadata = json.loads(data["view"]["private_metadata"])
+    channel_id = metadata["channel_id"]
 
     print("NEW ENTRY:")
     print("Customer:", customer)
@@ -166,7 +193,9 @@ def interactions():
     print("Note:", note)
     print("CSM:", username, "|", user_id)
 
-    # 👇 prepare payload
+    # -----------------------------
+    # SEND TO GOOGLE SHEETS
+    # -----------------------------
     sheet_payload = {
         "customer": customer,
         "sentiment": sentiment,
@@ -176,10 +205,18 @@ def interactions():
         "secret": os.environ.get("SHEET_SECRET")
     }
 
-    # 👇 async send (CRITICAL)
     threading.Thread(target=send_to_sheets, args=(sheet_payload,)).start()
 
+    # -----------------------------
+    # SEND SLACK CONFIRMATION
+    # -----------------------------
+    threading.Thread(
+        target=send_confirmation,
+        args=(user_id, channel_id, customer, topic)
+    ).start()
+
     return "", 200
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)
