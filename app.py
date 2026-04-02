@@ -41,7 +41,8 @@ def slack_command():
                             "placeholder": {
                                 "type": "plain_text",
                                 "text": "Search customer"
-                            }
+                            },
+                            "min_query_length": 0
                         }
                     },
                     {
@@ -63,13 +64,22 @@ def slack_command():
                         "block_id": "topic",
                         "label": {"type": "plain_text", "text": "Topic"},
                         "element": {
-                            "type": "plain_text_input",
-                            "action_id": "value"
+                            "type": "static_select",
+                            "action_id": "value",
+                            "placeholder": {"type": "plain_text", "text": "Select topic"},
+                            "options": [
+                                {"text": {"type": "plain_text", "text": "Product / Issues"}, "value": "product_issues"},
+                                {"text": {"type": "plain_text", "text": "Usage / Testing"}, "value": "usage_testing"},
+                                {"text": {"type": "plain_text", "text": "Commercial / Contract"}, "value": "commercial_contract"},
+                                {"text": {"type": "plain_text", "text": "Stakeholder / Organization"}, "value": "stakeholder_org"},
+                                {"text": {"type": "plain_text", "text": "Other"}, "value": "other"}
+                            ]
                         }
                     },
                     {
                         "type": "input",
                         "block_id": "note",
+                        "optional": True,
                         "label": {"type": "plain_text", "text": "Note"},
                         "element": {
                             "type": "plain_text_input",
@@ -83,7 +93,6 @@ def slack_command():
 
         requests.post(url, headers=headers, json=data)
 
-    # async → avoid Slack timeout
     threading.Thread(target=open_modal).start()
 
     return "", 200
@@ -126,8 +135,10 @@ def interactions():
 
     customer = values["customer"]["value"]["selected_option"]["value"]
     sentiment = values["sentiment"]["value"]["selected_option"]["value"]
-    topic = values["topic"]["value"]["value"]
-    note = values["note"]["value"]["value"]
+    topic = values["topic"]["value"]["selected_option"]["value"]
+
+    note_block = values["note"]["value"]
+    note = note_block.get("value", "")
 
     user_id = data["user"]["id"]
     username = data["user"]["username"]
@@ -137,7 +148,7 @@ def interactions():
     print("Sentiment:", sentiment)
     print("Topic:", topic)
     print("Note:", note)
-    print("CSM:", username, "|", user_id)
+    print("Logged by:", username, "|", user_id)
 
     return "", 200
 
