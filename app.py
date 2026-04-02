@@ -157,7 +157,8 @@ def interactions():
         "sentiment": sentiment,
         "topic": topic,
         "note": note,
-        "user": username
+        "user": username,
+        "secret": os.environ.get("SHEET_SECRET")
     }
 
     try:
